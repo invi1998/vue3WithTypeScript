@@ -1085,8 +1085,6 @@ const stop = watchEffect(() => {
 
 **注意：子孙层的`provide`会掩盖祖父层`provide`中相同`key`的属性值**
 
-
-
 ```javascript
 // 父组件
 provide('name', readonly(name)) // 加readonly 防止子组件修改父组件的值，违反了单向数据流的要求
@@ -1140,7 +1138,34 @@ template: `
 
 ![img](img/11884549-420a4ebd52462ab4.png)
 
-image-20210226142041400
+## 如何使用 Vue3 的模板引用？
+
+在 Vue3 组合式 API 中，setup 函数在组件实例化之前执行，所以无法访问到组件实例化之后的 $refs 属性，也就是无法获取组件实例 `this`。
+
+官方文档给出的获取组件实例方法 getCurrentInstance，它只适合于开发环境中，打包上线之后无法获取到组件实例 this。
+
+在使用组合式 API 时，响应式引用和模板引用的概念是统一的，即通过 ref() 来获取组件节点。
+
+```html
+<template>
+    <audio ref="audio" />
+</template>
+
+<script lang="ts">
+import { defineComponent, ref, Ref } from 'vue'
+
+export default defineComponent({
+  name: 'Demo',
+  setup() {
+    let audio: Ref<any>
+    audio = ref(null)
+    return { audio }
+  }
+})
+</script>
+```
+
+注意：在节点中声明的 ref 名称必须与 setup 函数内的变量名称保持一致；若你使用的是 TS，你必须要为变量指示类型为 any。
 
 ## 返回值
 
@@ -1365,4 +1390,170 @@ return {
     age
 }
 ```
+
+---
+
+## v-model（不推荐使用）
+
+v-model的本质是属性绑定和事件绑定的结合，可以在标签上使用也可以在组件上使用
+
+#### Vue2中v-model
+
+![img](img/26621755-142977d4fe005783.png)
+
+vue2标签使用
+
+![img](img/26621755-1a736993c5baf445.png)
+
+vue2组件使用
+
+**vue2 中 v-model实质是自定义属性：value和@input自定义事件**
+
+**$event有两层含义：**
+
+\1. 如果是**原始DOM**的事件，那么$event表示**js的原生事件对象**
+
+ 2.如果是**组件**的自定义事件，那么$event是**$emit传递的数据**
+
+
+
+#### Vue3中v-model
+
+**vue3 中 v-model的本质是 :modelValue 和 @update:modelValue 两者的绑定**
+
+![img](img/26621755-c67b29e314a13e74.png)
+
+vue3 组件使用（父组件）
+
+ 所以在**子组件**中响应定义modelValue属性
+
+![img](img/26621755-33d4f4d6c8f9a92b.png)
+
+自定义属性的定义（子组件）
+
+![img](img/26621755-42b202046d292899.png)
+
+原生自定义事件
+
+可以绑定多个v-model:
+
+![img](img/26621755-98e97f9bb24d4e41.png)
+
+v-model：xxx='xxx'
+
+**总结：**
+
+1.v-model可以通过绑定多个属性的方式，向子组件传递多个值并且保证双向绑定
+
+2.可以替代Vue2中sync修饰符（sync修饰符在Vue3中已经被废弃）
+
+3.操作DOM vue2和vue3用法是一样的，操作组件时不一样
+
+---
+
+## 指令API的变化（不推荐使用）
+
+vue3中指令api和组件保持一致，具体表现在：
+
+- bind → **beforeMount**
+
+- inserted→**mounted**
+
+- **beforeUpdate**： new!  元素自身更新前调用，和组件生命周期钩子很像
+
+- update→removed！和udpated基本相同，因此被移除，使用updated代替
+
+- componentUpdated → **updated**
+
+- **beforeUnmount** ：new!和组件生命周期钩子相似，元素将要被移除之前调用
+
+- unbind → **unmounted**
+
+  
+
+##### vue 2.0指令使用
+
+```vue
+<template>
+  <div>
+    <h1>自定义指令</h1>
+    <input type="text" v-autofoucs="true" placeholder="测试自定义指令" />
+  </div>
+</template>
+<script>
+export default {
+  data() {
+    return {};
+  },
+  directives: {
+    autofoucs: {
+      // 参数：el,binding,vnode,oldVnode
+      bind() {
+        console.log("bind");
+      },
+      inserted(el, { value }, vnode, oldVnode) {
+        console.log("inserted", el, vnode, oldVnode);
+        if (value) {
+          el.focus();
+        }
+      },
+
+      update() {
+        console.log("update");
+      },
+      componentUpdated() {
+        console.log("componentUpdated");
+      },
+      unbind() {
+        console.log("unbind");
+      },
+    },
+  },
+};
+</script>
+```
+
+##### vue3.0指令使用
+
+```vue
+<template>
+  <h1>自定义指令</h1>
+  <input type="text" v-autoFocus v-model="text" />
+</template>
+<script lang='ts'>
+import { defineComponent } from "vue";
+export default defineComponent({
+  data() {
+    return { text: "这是一段文本" };
+  },
+  directives: {
+    autoFocus: {
+     // 参数：el,binding,vnode,oldVnode
+      beforeMount() {
+        console.log("beforeMount");
+      },
+      mounted() {
+        console.log("mounted");
+      },
+      beforeUpdate() {
+        console.log("beforeUpdate");
+      },
+      updated() {
+        console.log("updated");
+      },
+      beforeUnmount() {
+        console.log("beforeUnmount");
+      },
+      unmounted() {
+        console.log("unmounted");
+      },
+    },
+  },
+});
+</script>
+<style scoped>
+</style>
+```
+
+
 
