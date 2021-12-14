@@ -11,7 +11,134 @@ vue3+typescript项目实战
 
 ## 核心功能
 
+JSON SCHEMA
+
+[AJV官网](https://ajv.js.org/)
+
+依赖
+
+安装ajv-errors, 安装ajv-i18n，安装ajv-format，安装ajv
+
+```bash
+npm install ajv-errors
+npm install ajv-i18n
+npm install ajv-format
+npm install ajv
+```
+
+使用
+
+```js
+// require("ajv-formats")(ajv)
+const Ajv = require("ajv")
+const ajv = new Ajv({allErrors: true})
+
+require('ajv-errors')(ajv)
+
+const localize = require("ajv-i18n")
+
+const addFormats = require("ajv-formats")
+addFormats(ajv)
+
+
+const schema = {
+  type: "object",
+  properties: {
+    name: {
+      type: 'string',
+      // format: 'email',
+      test: true,
+      errorMessage: {
+        type: '必须是字符串',
+        minLength: '长度不能小于10'
+      },
+      minLength: 10
+    },
+    age: {
+      type: 'integer',
+      testCmpile: 333,
+      errorMessage: '校验失败（不通过）'
+    },
+    pets: {
+      type: 'array',
+      items: {
+        type: 'string'
+      }
+    },
+    isWorker: {
+      type: 'boolean'
+    }
+  },
+  required: ['name', 'age']
+}
+
+ajv.addKeyword('test', {
+  // validate(schema, data) {
+  //   console.log(schema, data, '----------------------')
+  //   if (schema === true)
+  //     return true
+  //   return schema.length === 6
+  // },
+  macro() {
+    return {
+      minLength: 10
+    }
+  }
+})
+
+ajv.addKeyword('testCmpile', {
+  // compile(sch, parentSchema) {
+  //   console.log('sch, parentSchema = ' , sch, parentSchema)
+  //   return () => true
+  // },
+  metaSchema: {
+    type: 'integer',
+  }
+})
+
+const data = {
+  name: 'invi.com',
+  age: 32,
+  pets: ['dog', 'cat'],
+  isWorker: true
+}
+const valid = ajv.validate(schema, data)
+if (!valid) {
+  localize.zh(ajv.errors)
+  console.log(ajv.errors)
+}
+```
+
+## contexRef
+
+需要传入一个vue3的ref对象，然后我们在这个对象上挂载doValidate方法
+
+```tsx
+// vue2
+<Comp ref="comp"></Comp>
+this.$refs.comp.xxx()
+
+// vue3
+const yourRef = ref({})
+ onMounted(()=>{
+     yourRef.value.doValidate()
+ })
+
+<JsonSchemaForm contextRef={yourRef} />
+```
+
+对于vue2来说，这样使用$refs是很常见的，因为ref最终如果用在组件上面，它是会得到这个组件的vm对象，但是在vue3里面，我们的组件通过compsitionAPI来去实现了，而compsitionAPI他的vm上面（就是我们在compsition上面声明的这些变量看，reactive， ref...）是都不会出现在这个组件的vm对象上。所以你如果继续通过vue2里的这种方式去调用是调用不到的。那么这个函数我们怎么让他去调用呢？我们通过在声明组件的时候，让其传入一个contextRef，因为这个ref是通过props的方式来进行声明的，所以它接收的就是我们拿到的这个ref对象，然后我们就可以在这个组件内部给这个ref.value赋值，然后在外界就可以通过value.xxx()来进行调用了。
+
 ### 表单生成
+
+安装依赖
+
+```bash
+npm install monaco-editor@0.31.0
+npm install vue-jss
+```
+
+
 
 ### 主题系统
 
@@ -85,7 +212,26 @@ vue create vue3-json-schema-from-study
 
 介绍vue3的开发模式，着重介绍jsx的开发模式，这种开发模式相较于传统的vue2单文件template开发模式有很多优势。让大家在平时工作中多一种选择来维护项目
 
+## JSX
+
+Vue 3 Babel JSX 插件，以 JSX 的方式来编写 Vue 代码
+
+安装插件
+
+```bash
+npm install @vue/babel-plugin-jsx -D
+```
+
+配置 Babel
+
+```bash
+{
+  "plugins": ["@vue/babel-plugin-jsx"]
+}
+```
+
 # Vue3的Ts定义
+
 vue3源码全部都是使用的TypeScript编写，对于我们使用TypeScript来编写vue3应用的人来说，我们用好vue3的TypeScript定义就会大大的提高我们的开发效率
 
 ## Component接口

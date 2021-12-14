@@ -1,44 +1,38 @@
-import { defineComponent, reactive, ref } from 'vue'
-// import App from './App.vue'
+import { defineComponent, ref, Ref } from 'vue'
+import MonacoEditor from './components/MonacoEditor'
 
-import HelloWorld from './components/HelloWorld.vue'
-const img = require('./assets/logo.png')  // eslint-disable-line
-
-function renderHelloWorld(num: number) {
-  return <HelloWorld age={num} msg="test"></HelloWorld>
+function toJson(data: any) {
+  return JSON.stringify(data, null, 2)
 }
+
+const schema = {
+  type: 'string'
+}
+
+
 
 export default defineComponent({
   setup() {
-    const state = reactive({ name: 'duoyi' })
 
-    const numberRef = ref(1)
+    const schemaRef:Ref<any> = ref(schema)
 
-    const numHello = ref(100)
+    const handleCodeChange = (code: string) => {
+      let schema:any
+      try {
+        schema = JSON.parse(code)
+      } catch(err) {}
 
-    setInterval(() => {
-      state.name += '-/'
-      numberRef.value += 1
-    }, 1000)
-
-    // const number = numberRef.value
-
+      schemaRef.value = schema
+    }
+    
     return () => {
-      const number = numberRef.value
-
+      const code = toJson(schemaRef.value)
       return (
-        <div id="app">
-          <img src={img} alt="Vue Logo"></img>
-          <HelloWorld
-            msg="Welcome to Your Vue.js + TypeScript App"
-            age={1243}
-          ></HelloWorld>
-          <h1>{state.name + numberRef.value}</h1>
-          <h2>{number}</h2>
-          <input type="number" v-model={numHello.value} />
-          {renderHelloWorld(numHello.value)}
+        <div>
+          <MonacoEditor code={code} onChange={handleCodeChange} title='Schema INVI Editor'></MonacoEditor>
         </div>
       )
     }
+     
   },
 })
