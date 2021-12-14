@@ -2,11 +2,13 @@
   <div class="hello">
     <h1>{{ msg }}</h1>
     <h2>{{ age }}</h2>
+    <h3>{{ name }}</h3>
+    <h4>{{ name2 }}</h4>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { computed, defineComponent, ref, watchEffect } from 'vue'
 
 const PropsType = {
   msg: String,
@@ -26,6 +28,27 @@ export default defineComponent({
   //   },
   // },
   props: PropsType,
+  setup() {
+    const nameRef = ref('invi')
+
+    setInterval(() => {
+      // state.name += 'ts'
+      nameRef.value += 'ts'
+    }, 1000)
+
+    const computedName = computed(() => {
+      return nameRef.value + '0'
+    })
+
+    watchEffect(() => {
+      console.log(nameRef.value)
+    })
+
+    return {
+      name: nameRef,
+      name2: computedName,
+    }
+  },
 })
 </script>
 

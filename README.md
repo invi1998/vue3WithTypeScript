@@ -1515,7 +1515,7 @@ Composition Api在过去叫做Function-basesd Api 中文：组合API
 钩子函数：computed/onMounted
 上下文：getCurrentInstance / globalProperties
 
-目前，我们使用的是"opentios" API 构建组件。为了将逻辑添加到vue组件中，我们填充（options）属性，如data，methods，computed等。这种方法最大的缺点是，它本身不是一个工作的JavaScript代码。你需要确切的知道模板中科院访问哪些属性以及this关键字的行为。在底层，Vue编译器需要将此属性转换为工作代码。正因为如此，我们无法从类型检查中获益。
+目前，我们使用的是"opentios" API 构建组件。为了将逻辑添加到vue组件中，我们填充（options）属性，如data，methods，computed等。这种方法最大的缺点是，它本身不是一个工作的JavaScript代码。你需要确切的知道模板中可以访问哪些属性以及this关键字的行为。在底层，Vue编译器需要将此属性转换为工作代码。正因为如此，我们无法从类型检查中获益。
 
 Composition API希望通过当前组件属性、可用的机制公开JavaScript函数来解决这个问题。Vue核心团队将组件Composition API描述为"一套附加的，基于函数的API，允许灵活的组合组件逻辑"。使用Composition API编写的代码更易读，并且常见不复杂。
 
@@ -1960,7 +1960,7 @@ const state = reactive({
     name: 'elfecho'
 })
 setTimeout(() => {
-    state.name = 'elf'
+    state.name += 'elf'
 }, 2000)
 ```
 
@@ -2054,15 +2054,13 @@ setTimeout(() => {
 
   一个业务关注点有多个值，建议reactive
 
-  
-
   ```javascript
   const mouse = reactive({
       x: 0,
       y: 0
   })
   ```
-
+  
 - 降低Ref负担的方法：利用unref、isRef、isProxy等工具方法，利用一些命名约定。
 
   
@@ -2110,6 +2108,127 @@ return {
     age
 }
 ```
+
+对于我们如果想写一个非sfc的组件（jsx/tsx），推荐的方法是使用setup去写。通过setup 来返回一个函数，然后去实现功能。因为setup返回的函数，我们是可以在setup中去使用声明的所有reative，ref，computed，watchEffect等等这些声明。并且直接通过js的闭包特性，我们就可以直接在return这个地方去使用了。
+
+```tsx
+import { createApp, defineComponent, h, reactive } from 'vue'
+// import App from './App.vue'
+
+import HelloWorld from './components/HelloWorld.vue'
+const img = require('./assets/logo.png')  // eslint-disable-line
+
+const App = defineComponent({
+  setup() {
+
+    const state = reactive({name: 'duoyi'})
+
+    setInterval(()=>{
+      state.name += '-/'
+    }, 1000)
+
+    return () => {
+      const number = number
+      return h('div', {id: 'app'}, [
+        h('img', {
+          alt: 'Vue Logo',
+          src: img,
+        }),
+        h(HelloWorld, {msg:"Welcome to Your Vue.js + TypeScript App", age:123}),
+        h('h1', state.name)
+      ])
+    }
+  }
+})
+
+createApp(App).mount('#app')
+
+```
+
+这是一个非常典型的js闭包使用，通过在setup函数内部去声明了这个变量，然后我们return了一个函数，这个函数就可以调用他的父级函数作用域内的变量。这种闭包带来非常多的好处，一个很明显的特点就是我们的变量引用变得非常明确。同时ts也会给我们提供一个变量引用的提醒
+
+```tsx
+import { createApp, defineComponent, h, reactive, ref } from 'vue'
+// import App from './App.vue'
+
+import HelloWorld from './components/HelloWorld.vue'
+const img = require('./assets/logo.png')  // eslint-disable-line
+
+const App = defineComponent({
+  setup() {
+
+    const state = reactive({name: 'duoyi'})
+
+    const numberRef = ref(1)
+
+    setInterval(()=>{
+      state.name += '-/'
+      numberRef.value += 1
+    }, 1000)
+	// 注意看这段代码
+    const number = numberRef.value
+
+    return () => {
+      return h('div', {id: 'app'}, [
+        h('img', {
+          alt: 'Vue Logo',
+          src: img,
+        }),
+        h(HelloWorld, {msg:"Welcome to Your Vue.js + TypeScript App", age:123}),
+        h('h1', state.name + numberRef.value),
+        h('h1', number)	// 注意看这里 -------》节点2
+      ])
+    }
+  }
+})
+
+createApp(App).mount('#app')
+
+```
+
+看上面这个代码，在我们很多地方都需要调用numberRef.value的时候，为了节省编写，省略这个.value的重复编写，我们可以用一个变量把numberRef.value给取出来。可能有人会这样写，但是这样写导致的后果就是，页面上这个 节点2 并不会进行更新，也就是说，如果我们不把或者赋值代码放在return函数里面，那么他就是无效的。首先我们知道，setup这个函数是只会执行一次的，也就是说，如果我们像上面这个写法，number就永远都只会是初始化的那个值，他不会再次执行去更新得到numberRef.value的新值。然后第二点，我们对于reactive的变量或对象，或者ref的value的变化，他会引起我们return的这个函数的重新执行，来生成新的dom树，而不会触发setup的重新执行。所以我们对于这些变量的值的最终读取，都应该放在返回函数里进行。他才会让我们在每次重新渲染节点树的时候产生效果，进行更新。
+
+```tsx
+import { createApp, defineComponent, h, reactive, ref } from 'vue'
+// import App from './App.vue'
+
+import HelloWorld from './components/HelloWorld.vue'
+const img = require('./assets/logo.png')  // eslint-disable-line
+
+const App = defineComponent({
+  setup() {
+
+    const state = reactive({name: 'duoyi'})
+
+    const numberRef = ref(1)
+
+    setInterval(()=>{
+      state.name += '-/'
+      numberRef.value += 1
+    }, 1000)
+
+    // const number = numberRef.value
+
+    return () => {
+      const number = numberRef.value
+      return h('div', {id: 'app'}, [
+        h('img', {
+          alt: 'Vue Logo',
+          src: img,
+        }),
+        h(HelloWorld, {msg:"Welcome to Your Vue.js + TypeScript App", age:123}),
+        h('h1', state.name + numberRef.value),
+        h('h1', number)
+      ])
+    }
+  }
+})
+
+createApp(App).mount('#app')
+
+```
+
+
 
 ---
 
