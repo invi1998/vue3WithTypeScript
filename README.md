@@ -64,7 +64,25 @@ vue create vue3-json-schema-from-study
 }
 ```
 
+如果vscode配置了之后还是不能保存格式化，可以在setting中追加下面的配置
+
+```json
+  "typescript.preferences.quoteStyle": "single",
+    "editor.tabSize": 2,
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "prettier.requireConfig": false,
+    "prettier.singleQuote": true,
+    "editor.formatOnSave": true,
+    "editor.detectIndentation": false,
+    "editor.formatOnSave": true,
+    "files.associations": {
+    }
+```
+
 # Vue3开发模式讲解
+
 介绍vue3的开发模式，着重介绍jsx的开发模式，这种开发模式相较于传统的vue2单文件template开发模式有很多优势。让大家在平时工作中多一种选择来维护项目
 
 # Vue3的Ts定义
@@ -398,7 +416,137 @@ props: {
 
 所以这就为什么建议，在定义或者使用Object相关的类型，或者其他任何地方的类型的时候，尽量不要去使用any，也不要直接使用Object，对于这种对象类型的，就把它的key类型列出来，告诉Ts，然后让它来帮你做鉴别，这样你写代码的时候，就会大大减少你的出错率
 
+### 如何提取props定义
 
+首先对于vue3，我们如果要使用props，是依然要去定义它的。现在有这么一个情景，假设有多个组件，然后他们的props类型是相同的，或者就差一点点，我们希望去复用这个声明，而不是在每个组件上面都要去写一遍这个对象，去声明他的key，类型，是否required等，那么就可以把这个props声明给提取出来。
+
+```tsx
+<script lang="ts">
+import { defineComponent } from 'vue'
+
+const PropsType = {
+  msg: String,
+  age: {
+    type: Number,
+    requried: true,
+  },
+} as const
+
+export default defineComponent({
+  name: 'HelloWorld',
+  // props: {
+  //   msg: String,
+  //   age: {
+  //     type: Number,
+  //     requried: true,
+  //   },
+  // },
+  props: PropsType,
+})
+</script>
+```
+
+关于这里提取出来的props为什么要写 as const，解释如下
+
+首先看 `defineComponent`的源码
+
+```tsx
+export declare function defineComponent<PropsOptions extends Readonly<ComponentPropsOptions>, RawBindings, D, C extends ComputedOptions = {}, M extends MethodOptions = {}, Mixin extends ComponentOptionsMixin = ComponentOptionsMixin, Extends extends ComponentOptionsMixin = ComponentOptionsMixin, E extends EmitsOptions = Record<string, any>, EE extends string = string>(options: ComponentOptionsWithObjectProps<PropsOptions, RawBindings, D, C, M, Mixin, Extends, E, EE>): DefineComponent<PropsOptions, RawBindings, D, C, M, Mixin, Extends, E, EE>;
+```
+
+其实这里不需要看太多，只需要看一个点，`<PropsOptions extends Readonly<ComponentPropsOptions>`看他的类型模板类型参数声明，也就是这里props，他这里是继承了一个readonly的，所以如果你把这里PropsType写成const，那么他就会执行这个模板函数，当然这里你也可以不写成const，这里写成const只是因为之前ts版本他的类型推断会有问题。vue3类型推断有误，即props类型定义设置require:true，但使用时，仍然显示类型可为undefined， 解决方法：在定义props类型后加上as const
+
+```ts
+// as const之后props的类型
+const PropsType: {
+    readonly msg: StringConstructor;
+    readonly age: {
+        readonly type: NumberConstructor;
+        readonly requried: true;
+    };
+}
+// 取消as const时props的类型
+const PropsType: {
+    msg: StringConstructor;
+    age: {
+        type: NumberConstructor;
+        requried: boolean;
+    };
+}
+```
+
+### vue的h函数详细说明
+
+h函数可以说是对于我们理解vue算是一个非常重要的内容，首先看main.ts里这段代码
+
+```ts
+import { createApp } from 'vue'
+import App from './App.vue'
+
+createApp(App).mount('#app')
+```
+
+在vue3当中，我们通过 createApp 来传入我们的根组件（也就是这里的app.vue），然后它mount到我们对应的节点上，这样我们的页面就渲染出来了，这其实和我们之前vue2的时候通过new一个vue，然后$mount内部的原理其实是差不多的。我们这里关心的是这个组件，在vue3中，我们知道是通过defineComponent来创建一个组件，那么我们就可以在这里通过defineComponent来取创建一个App。如下。
+
+```ts
+import { createApp, defineComponent } from 'vue'
+// import App from './App.vue'
+
+const App = defineComponent({
+  render() {
+    return 'HelloWorld'
+  },
+})
+
+createApp(App).mount('#app')
+```
+
+把之前的App给注释了，然后在defineComponent中通过render来return创建一个内容。那么这个页面是否可以被渲染出来呢？是可以的，结果如下
+
+![](img/impicture_20211214_112538.png)
+
+那接下来要分享的就是，vue是如何渲染我们的节点内容。我们此前大多数使用的都是以.vue这种文件模式来进行vue项目开发，这是vue自己开发的一种叫做SFC（single file component)，这种开发模式他专门设置这种.vue的格式，上面是html，中间是js，然后下面还可以是css，这种格式对于新人来说，是很友好的，开发效率也很可观，但是我们要知道的一个点是，这个.vue文件并不是一个可直接执行的前端文件，最终我们的vue文件是需要通过vue-loader，通过webpack，通过rollup等这种打包工具把它编译成js代码，然后最后他才能在浏览器跑起来。所以你看到的在vue文件中写的模板template内容，其他并不真正对应我们在浏览器里的html内容，他不是通过你写的这些字符串去进行拼接的，而是通过函数调用来去创建的。
+
+```ts
+import { createApp, defineComponent, h } from 'vue'
+// import App from './App.vue'
+
+import HelloWorld from './components/HelloWorld.vue'
+
+// import img from './assets/logo.png'
+const img = require('./assets/logo.png')  // eslint-disable-line
+// 如果直接这么写，在ts里因为ts类型校验比较强，所以会报错ts校验不通过，这里换成requried
+
+// 这里h其实对应的就是react里的createElement,这个其实是差不多的一个东西，他就是用来创建节点的
+// 第一个参数是节点类型：比如一个div原生节点，就直接用字符串进行声明,如果我们需要创建一个hellWorld组件，那么我们直接传HelloWorld那个对象即可
+// 然后第二个参数是这个节点的属性，
+// 第三个参数是他子节点信息
+const App = defineComponent({
+  render() {
+    return h('div', {id: 'app'}, [
+      // h('img', {alt: 'Vue Logo', src: './assets/logo.png'}),
+      h('img', {alt: 'Vue Logo', src: img}),
+      h(HelloWorld, {msg: 'Welcome to Your Vue.js + TypeScript App', age:1212})
+    ])
+  },
+})
+
+// 然后注意这里，如果对于这种静态资源路径，比如这个图片，他没有显示出来
+// 为什么？因为如果我们在templat里面去写的中src路径字符串（相对路径的地址），vue-loader是会进行一个寻址的
+// 他会根据这个图片的相对地址，通过file-loader或者url-loader做webpack的loader来去加载那个图片形成一个真正的path
+// 那么对于这种jsx的写法，这中肯定是不行的。所以需要使用import进行引入使用
+
+createApp(App).mount('#app')
+
+```
+
+![](img/impicture_20211214_115736.png)
+
+h函数源码简述
+
+![](img/impicture_20211214_120018.png)
+
+h函数他接收的type是any，因为他可以接收一个字符串，也可以接收一个对象，也可以接收一个funtion。然后他的props和children。这两个都是可以不传的。然后它去判断参数长度，如果是两个，那么第二个参数就有可能是props或者children，如果是3个，那就3个参数都在。然后这里有个isVNode判断，因为h函数他最终返回的就是一个VNode对象（虚拟dom），vue就是通过这个虚拟DOM来去映射到我们实际的html的dom，根据这个映射关系，在我们更新了vnode之后，VNode会根据这个虚拟DOM树里的更新去映射到实际dom上的更新，然后去更新html，这就是vnode的一个简单逻辑，然后h函数的作用就是来创建vnode
 
 
 除去单元测试中几种基本的用法，在以下的 ParentDialog 组件中，主要有这几个实际开发中要注意的点：
